@@ -13,12 +13,15 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class MotorPool implements EstrategiaConexion {
-    private static volatile MotorPool instancia;
+    // Cambiado a mapa de instancias para soportar multiples pools (por URL)
+    private static final ConcurrentHashMap<String, MotorPool> INSTANCIAS = new ConcurrentHashMap<>();
+
     private final BlockingQueue<ConnectionHolder> pool;
     private final List<ConnectionHolder> holders = new ArrayList<>();
     private final Ajustes ajustes;
@@ -44,36 +47,46 @@ public class MotorPool implements EstrategiaConexion {
         }
     }
 
-    // Constructor singleton
+    // Constructor privado
     private MotorPool(Ajustes ajustes) {
         this.ajustes = Objects.requireNonNull(ajustes);
         this.maxPoolSize = Math.max(1, ajustes.limitePool());
         this.pool = new ArrayBlockingQueue<>(this.maxPoolSize);
 
-        // Prellenar el pool con holders
-        for (int i = 0; i < this.maxPoolSize; i++) {
+        // Intentar prellenar el pool con holders; no fallar completamente si la BD no está disponible.
+        // Para evitar generar muchos errores si la BD no existe, prellenamos solo 1 conexión de prueba y hacemos creación bajo demanda.
+        int prefill = Math.min(1, this.maxPoolSize);
+        int exitos = 0;
+        for (int i = 0; i < prefill; i++) {
             try {
                 Connection real = crearConexionReal();
                 ConnectionHolder holder = new ConnectionHolder(real);
                 holders.add(holder);
                 pool.offer(holder);
                 totalConexionesCreadas.incrementAndGet();
+                exitos++;
             } catch (SQLException e) {
-                // Si falla la creación, lanzamos una excepción en tiempo de inicialización
-                throw new RuntimeException("Error creando conexiones del pool", e);
+                // Registrar el error y continuar intentando crear las demás conexiones.
+                System.err.println("ERROR: no se pudo crear conexion del pool (intento " + (i+1) + "): " + e.getMessage());
+                // No lanzar RuntimeException aquí para permitir que la aplicación siga en ejecución.
             }
+        }
+
+        if (exitos == 0) {
+            System.err.println("ADVERTENCIA: No se pudieron crear conexiones del pool al inicializar (0/" + this.maxPoolSize + ").\n" +
+                    "  - Revise que la base de datos exista y las credenciales sean correctas.\n" +
+                    "  - Mensaje original de la URL: " + ajustes.url());
+        } else {
+            System.out.println("MotorPool inicializado: " + exitos + " conexiones creadas de " + this.maxPoolSize);
         }
     }
 
+    /**
+     * Obtiene/crea una instancia de MotorPool para la URL del ajuste (pool por URL)
+     */
     public static MotorPool getInstance(Ajustes ajustes) {
-        if (instancia == null) {
-            synchronized (MotorPool.class) {
-                if (instancia == null) {
-                    instancia = new MotorPool(ajustes);
-                }
-            }
-        }
-        return instancia;
+        String key = ajustes.url();
+        return INSTANCIAS.computeIfAbsent(key, k -> new MotorPool(ajustes));
     }
 
     private Connection crearConexionReal() throws SQLException {
@@ -220,6 +233,23 @@ public class MotorPool implements EstrategiaConexion {
             tiempoEsperaTotal.addAndGet(tiempoEspera);
 
             if (holder == null) {
+                // Intentar crear una nueva conexión bajo demanda si el pool está vacío
+                synchronized (this) {
+                    if (holders.size() < maxPoolSize && !cerrado) {
+                        try {
+                            Connection real = crearConexionReal();
+                            ConnectionHolder h = new ConnectionHolder(real);
+                            holders.add(h);
+                            totalConexionesCreadas.incrementAndGet();
+                            // devolver proxy directo sin meter al pool (simula adquisición)
+                            h.inUse.set(true);
+                            h.tiempoAdquisicion = System.currentTimeMillis();
+                            return crearProxyForHolder(h);
+                        } catch (SQLException e) {
+                            throw new SQLException("Timeout y no se pudo crear conexion bajo demanda: " + e.getMessage(), e);
+                        }
+                    }
+                }
                 throw new SQLException("Timeout: no hay conexiones disponibles en el pool (espera: " + tiempoEspera + "ms)");
             }
 
@@ -291,9 +321,8 @@ public class MotorPool implements EstrategiaConexion {
         pool.clear();
         holders.clear();
 
-        synchronized (MotorPool.class) {
-            instancia = null;
-        }
+        // Eliminar esta instancia del mapa de instancias
+        INSTANCIAS.remove(ajustes.url());
     }
 
     // Métodos para monitoreo del pool

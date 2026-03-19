@@ -1,0 +1,6 @@
+{
+  "usuarios.select": "SELECT id, nombre, email FROM usuarios LIMIT ?",
+  "usuarios.count": "SELECT COUNT(*) as total FROM usuarios",
+  "usuarios.by_id": "SELECT id, nombre, email FROM usuarios WHERE id = ?"
+}
+

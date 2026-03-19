@@ -5,6 +5,7 @@ import com.MariaBermudez.utilidades.RegistradorLog;
 import java.sql.*;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import com.MariaBermudez.db.QueryStore;
 
 /**
  * Gestor centralizado de adaptadores de base de datos
@@ -89,8 +90,10 @@ public class DBManager {
     }
 
     /**
-     * Ejecuta una consulta con callback
+     * Ejecuta una consulta con callback (API legacy: pasa Connection directamente).
+     * Nota: esta API permite ejecutar SQL crudo si el callback lo realiza, úsela solo internamente.
      */
+    @Deprecated
     public <T> T ejecutarQuery(String nombreAdapter, QueryCallback<T> callback) throws SQLException {
         DBComponent adapter = getAdapter(nombreAdapter);
 
@@ -100,8 +103,9 @@ public class DBManager {
     }
 
     /**
-     * Ejecuta una consulta con el adapter por defecto
+     * Ejecuta una consulta con el adapter por defecto (legacy)
      */
+    @Deprecated
     public <T> T ejecutarQuery(QueryCallback<T> callback) throws SQLException {
         return ejecutarQuery(getDefaultAdapter(), callback);
     }
@@ -113,8 +117,9 @@ public class DBManager {
     }
 
     /**
-     * Ejecuta una transacción
+     * Ejecuta una transacción (legacy)
      */
+    @Deprecated
     public <T> T ejecutarTransaccion(String nombreAdapter, TransaccionCallback<T> callback) throws SQLException {
         DBComponent adapter = getAdapter(nombreAdapter);
         Connection conn = null;
@@ -146,6 +151,53 @@ public class DBManager {
                     RegistradorLog.escribir(-1, "ERROR CLOSE: " + e.getMessage(), 0, 0, "DBManager", "");
                 }
             }
+        }
+    }
+
+    /**
+     * Ejecuta una consulta predefinida (SELECT) identificada por nombre.
+     * Solo permite ejecutar SQL predefinido cargado por QueryStore y evita exponer SQL crudo.
+     */
+    public interface QueryResultHandler<T> {
+        T handle(ResultSet rs) throws SQLException;
+    }
+
+    public <T> T ejecutarQueryPorNombre(String nombreAdapter, String nombreQuery, Object[] params, QueryResultHandler<T> handler) throws SQLException {
+        DBComponent adapter = getAdapter(nombreAdapter);
+        String sql = QueryStore.getInstance().getQuery(nombreQuery);
+        if (sql == null) {
+            throw new IllegalArgumentException("No existe la query definida: " + nombreQuery);
+        }
+
+        try (Connection conn = adapter.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            if (params != null) {
+                for (int i = 0; i < params.length; i++) {
+                    ps.setObject(i + 1, params[i]);
+                }
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                return handler.handle(rs);
+            }
+        }
+    }
+
+    /**
+     * Ejecuta una consulta predefinida de actualización (INSERT/UPDATE/DELETE) por nombre.
+     */
+    public int ejecutarUpdatePorNombre(String nombreAdapter, String nombreQuery, Object[] params) throws SQLException {
+        DBComponent adapter = getAdapter(nombreAdapter);
+        String sql = QueryStore.getInstance().getQuery(nombreQuery);
+        if (sql == null) {
+            throw new IllegalArgumentException("No existe la query definida: " + nombreQuery);
+        }
+
+        try (Connection conn = adapter.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            if (params != null) {
+                for (int i = 0; i < params.length; i++) {
+                    ps.setObject(i + 1, params[i]);
+                }
+            }
+            return ps.executeUpdate();
         }
     }
 
@@ -188,7 +240,7 @@ public class DBManager {
     }
 
     /**
-     * Callback para queries
+     * Callback para queries (legacy)
      */
     @FunctionalInterface
     public interface QueryCallback<T> {
@@ -196,7 +248,7 @@ public class DBManager {
     }
 
     /**
-     * Callback para transacciones
+     * Callback para transacciones (legacy)
      */
     @FunctionalInterface
     public interface TransaccionCallback<T> {

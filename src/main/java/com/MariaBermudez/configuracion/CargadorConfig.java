@@ -18,6 +18,8 @@ public class CargadorConfig {
 
     private static final String CONFIG_POSTGRES = "config-postgres.json";
     private static final String CONFIG_MYSQL = "config-mysql.json";
+    // Nombre adicional detectado en el workspace
+    private static final String CONFIG_MYSQL_ALT = "configMySQL.json";
 
     private static ObjectMapper mapper = new ObjectMapper()
             .enable(SerializationFeature.INDENT_OUTPUT)
@@ -27,7 +29,13 @@ public class CargadorConfig {
      * Carga la configuracion desde el archivo config.json en resources
      */
     public static Ajustes cargar() {
-        return cargar(CONFIG_FILE);
+        // Intentar varios nombres de archivo comunes para mayor robustez
+        String[] candidatos = new String[]{CONFIG_FILE, CONFIG_MYSQL, CONFIG_MYSQL_ALT, CONFIG_POSTGRES};
+        for (String candidato : candidatos) {
+            Ajustes a = cargar(candidato);
+            if (a != null) return a;
+        }
+        return crearConfiguracionDefault();
     }
 
     /**
@@ -93,12 +101,11 @@ public class CargadorConfig {
         try {
             return cargarDesdeArchivo(ruta);
         } catch (Exception e) {
+            // No encontrado en filesystem -> devolver null para que el llamador pruebe otro candidato
             System.err.println("No se encontro " + ruta + " en el sistema de archivos");
         }
 
-        // Si todo falla, crear configuracion por defecto
-        System.err.println("Usando configuracion por defecto");
-        return crearConfiguracionDefault();
+        return null;
     }
 
     /**
