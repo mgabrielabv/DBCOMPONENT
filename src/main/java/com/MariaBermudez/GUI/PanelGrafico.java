@@ -1,102 +1,107 @@
 package com.MariaBermudez.GUI;
+
 import javax.swing.*;
 import java.awt.*;
+import java.awt.geom.Point2D;
 
 public class PanelGrafico extends JPanel {
-    // Contadores para cada motor
-    private int poolExitos = 0;
-    private int poolFallos = 0;
-    private int rawExitos = 0;
-    private int rawFallos = 0;
+    private int exitos = 0;
+    private int fallos = 0;
 
-    public PanelGrafico() { setOpaque(false); }
+    public PanelGrafico() {
+        setOpaque(false);
+        setPreferredSize(new Dimension(220, 220));
+    }
 
-    @SuppressWarnings("unused")
-    // Actualiza los contadores de ambos motores y repinta
-    public synchronized void actualizarContadores(int pEx, int pFa, int rEx, int rFa) {
-        this.poolExitos = pEx;
-        this.poolFallos = pFa;
-        this.rawExitos = rEx;
-        this.rawFallos = rFa;
+    public synchronized void actualizar(int e, int f) {
+        this.exitos = e;
+        this.fallos = f;
         repaint();
     }
 
-    // Resetea los contadores
-    public synchronized void limpiar() { poolExitos = poolFallos = rawExitos = rawFallos = 0; repaint(); }
+    public void limpiar() {
+        this.exitos = 0;
+        this.fallos = 0;
+        repaint();
+    }
 
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        Graphics2D g2 = (Graphics2D) g;
+        Graphics2D g2 = (Graphics2D) g.create();
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-        int w = getWidth();
-        int h = getHeight();
+        int ancho = getWidth();
+        int alto = getHeight();
+        int size = Math.min(ancho, alto);
+        int padding = Math.max(18, size / 8);
+        int diametro = size - padding * 2;
+        int x = (ancho - diametro) / 2;
+        int y = (alto - diametro) / 2;
 
-        int size = Math.min(w / 2 - 40, h - 80);
-        int x1 = 20;
-        int y = (h - size) / 2;
-        int x2 = w / 2 + 20;
+        float stroke = Math.max(8f, diametro * 0.08f);
+        g2.setStroke(new BasicStroke(stroke, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
 
+        Color bgRing = Estilos.PANEL_INTERNO;
+        Color bgRingSemi = new Color(bgRing.getRed(), bgRing.getGreen(), bgRing.getBlue(), 200);
+        g2.setColor(bgRingSemi);
+        g2.drawOval(x, y, diametro, diametro);
 
-        int poolTotal = poolExitos + poolFallos;
-        int rawTotal = rawExitos + rawFallos;
-        float poolPct = (poolTotal == 0) ? 0f : (poolExitos * 100f) / poolTotal;
-        float rawPct = (rawTotal == 0) ? 0f : (rawExitos * 100f) / rawTotal;
-
-        // Dibujar fondo y títulos
-        g2.setColor(Estilos.SUBTEXT);
-        g2.setFont(Estilos.LBL);
-        g2.drawString("POOL", x1 + size/2 - 20, y - 10);
-        g2.drawString("RAW", x2 + size/2 - 15, y - 10);
-
-        // Dibujar donut para Pool
-        drawDonut(g2, x1, y, size, poolExitos, poolFallos, Estilos.GREEN, Estilos.RED, poolPct);
-
-        // Dibujar donut para Raw
-        drawDonut(g2, x2, y, size, rawExitos, rawFallos, Estilos.ACCENT, Estilos.RED, rawPct);
-
-        // Leyendas y contadores
-        g2.setFont(Estilos.MONO);
-        g2.setColor(Estilos.TEXT);
-        String poolText = String.format("E: %d  F: %d  (%.1f%%)", poolExitos, poolFallos, poolPct);
-        String rawText = String.format("E: %d  F: %d  (%.1f%%)", rawExitos, rawFallos, rawPct);
-        g2.drawString(poolText, x1 + 10, y + size + 25);
-        g2.drawString(rawText, x2 + 10, y + size + 25);
-    }
-
-    //Grafico con porcion de exito y fallo
-    private void drawDonut(Graphics2D g2, int x, int y, int size, int exitos, int fallos, Color cEx, Color cFa, float pct) {
-        int start = 90;
         int total = exitos + fallos;
-        int angleEx = (total == 0) ? 0 : Math.round((exitos * 360f) / total);
+        int startAngle = 90;
+        if (total > 0) {
+            int anguloExito = (int) Math.round(((double) exitos / total) * 360);
+            g2.setColor(Estilos.CIAN_CONTRASTE);
+            g2.drawArc(x, y, diametro, diametro, startAngle, -anguloExito);
+            if (fallos > 0) {
+                g2.setColor(new Color(220, 60, 120));
+                g2.drawArc(x, y, diametro, diametro, startAngle - anguloExito, -(360 - anguloExito));
+            }
+        }
 
-        // Capa fondo (gris suave)
-        g2.setColor(new Color(40, 40, 48));
-        g2.fillOval(x, y, size, size);
+        int innerDiam = (int) (diametro - stroke * 1.6);
+        int ix = x + (diametro - innerDiam) / 2;
+        int iy = y + (diametro - innerDiam) / 2;
 
-        // Arco de exitos
-        g2.setColor(cEx);
-        g2.fillArc(x, y, size, size, start, -angleEx);
+        float radius = innerDiam / 2f;
+        float[] dist = {0f, 1f};
+        Color c1 = Estilos.PANEL_INTERNO.brighter();
+        Color c2 = new Color(18, 6, 36);
+        RadialGradientPaint rg = new RadialGradientPaint(new Point2D.Float(ix + radius, iy + radius), radius, dist, new Color[]{c1, c2});
+        g2.setPaint(rg);
+        g2.fillOval(ix, iy, innerDiam, innerDiam);
 
-        // Arco de fallos
-        g2.setColor(cFa);
-        g2.fillArc(x, y, size, size, start - angleEx, -(360 - angleEx));
+        GradientPaint gloss = new GradientPaint(0, iy, new Color(255, 255, 255, 50), 0, iy + innerDiam / 2f, new Color(255, 255, 255, 6));
+        g2.setPaint(gloss);
+        g2.fillOval(ix, iy, innerDiam, innerDiam / 2);
 
-        // Circulo interior para efecto donut
-        int inner = (int)(size * 0.55);
-        int ix = x + (size - inner) / 2;
-        int iy = y + (size - inner) / 2;
-        g2.setColor(Estilos.BG);
-        g2.fillOval(ix, iy, inner, inner);
-
-        // Texto central con porcentaje
-        g2.setColor(Estilos.TEXT);
-        g2.setFont(Estilos.BIG_NUM);
-        String txt = (total == 0) ? ".." : String.format("%.0f%%", pct);
+        g2.setColor(Color.WHITE);
+        Font titulo = Estilos.FUENTE_TITULO.deriveFont(Font.BOLD, Math.max(18f, innerDiam * 0.22f));
+        g2.setFont(titulo);
+        String pct = (total == 0) ? "0%" : (exitos * 100 / total) + "%";
         FontMetrics fm = g2.getFontMetrics();
-        int tx = ix + (inner - fm.stringWidth(txt)) / 2;
-        int ty = iy + (inner + fm.getAscent()) / 2 - 4;
-        g2.drawString(txt, tx, ty);
+        int px = ix + (innerDiam - fm.stringWidth(pct)) / 2;
+        int py = iy + (innerDiam / 2) + (fm.getAscent() / 3);
+        g2.drawString(pct, px, py);
+
+        Font etiqueta = Estilos.FUENTE_TITULO.deriveFont(Font.PLAIN, Math.max(10f, innerDiam * 0.09f));
+        g2.setFont(etiqueta);
+        String label = "Éxito";
+        FontMetrics fm2 = g2.getFontMetrics();
+        int lx = ix + (innerDiam - fm2.stringWidth(label)) / 2;
+        int ly = py + fm2.getHeight();
+        g2.setColor(new Color(255, 255, 255, 200));
+        g2.drawString(label, lx, ly);
+
+        Font conteos = Estilos.FUENTE_TITULO.deriveFont(Font.PLAIN, Math.max(10f, innerDiam * 0.08f));
+        g2.setFont(conteos);
+        String counts = exitos + " / " + total;
+        FontMetrics fm3 = g2.getFontMetrics();
+        int cx = ix + (innerDiam - fm3.stringWidth(counts)) / 2;
+        int cy = iy + innerDiam - fm3.getHeight() / 2;
+        g2.setColor(new Color(255, 255, 255, 120));
+        g2.drawString(counts, cx, cy);
+
+        g2.dispose();
     }
 }

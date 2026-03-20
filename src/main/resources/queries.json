@@ -1,6 +1,5 @@
 {
-  "usuarios.select": "SELECT id, nombre, email FROM usuarios LIMIT ?",
-  "usuarios.count": "SELECT COUNT(*) as total FROM usuarios",
-  "usuarios.by_id": "SELECT id, nombre, email FROM usuarios WHERE id = ?"
+  "insertar_usuario": "INSERT INTO usuarios (nombre, correo) VALUES (?, ?)",
+  "borrar_usuario": "DELETE FROM usuarios WHERE id = ?",
+  "lista_usuarios": "SELECT * FROM usuarios"
 }
-

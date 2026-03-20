@@ -1,10 +1,10 @@
 {
   "url": "jdbc:mysql://localhost:3306/test_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true",
   "usuario": "root",
-  "clave": "123456789",
-  "query": "SELECT * FROM usuarios LIMIT 100",
-  "muestras": 5000,
-  "reintentos": 3,
-  "salto": 100,
-  "limitePool": 20
+  "clave": "maria123",
+  "driver": "com.mysql.cj.jdbc.Driver",
+  "poolSize": 20,
+  "queries": {
+    "default": "SELECT * FROM usuarios LIMIT 100"
+  }
 }

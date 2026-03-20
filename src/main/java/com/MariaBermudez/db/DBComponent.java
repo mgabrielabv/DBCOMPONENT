@@ -1,59 +1,50 @@
 package com.MariaBermudez.db;
 
-import com.MariaBermudez.modelos.Ajustes;
-import java.sql.Connection;
-import java.sql.SQLException;
+import com.MariaBermudez.db.adapters.IAdapter;
+import java.sql.*;
+import java.util.Map;
+import java.util.concurrent.ArrayBlockingQueue;
 
-/**
- * Componente abstracto para adaptadores de base de datos
- */
-public abstract class DBComponent {
-    protected final Ajustes ajustes;
-    protected final String tipoMotor;
-    protected final String nombre;
+public class DBComponent<T extends IAdapter> {
+    private final ArrayBlockingQueue<Connection> pool;
+    private final Map<String, String> queries;
+    private Connection conexionTransaccional = null;
 
-    protected DBComponent(Ajustes ajustes, String tipoMotor, String nombre) {
-        this.ajustes = ajustes;
-        this.tipoMotor = tipoMotor;
-        this.nombre = nombre;
+    public DBComponent(IAdapter adapter, String url, String user, String pass, int poolSize, Map<String, String> queries) throws Exception {
+        this.queries = queries;
+        this.pool = new ArrayBlockingQueue<>(poolSize);
+        for (int i = 0; i < poolSize; i++) {
+            pool.add(adapter.conectar(url, user, pass));
+        }
     }
 
-    /**
-     * Obtiene una conexión a la base de datos
-     */
-    public abstract Connection getConnection() throws SQLException;
+    public void query(String id) throws Exception {
+        String sql = queries.get(id);
+        if (sql == null) throw new Exception("ID de query no encontrado: " + id);
 
-    /**
-     * Cierra todos los recursos del componente
-     */
-    public abstract void shutdown();
 
-    /**
-     * Verifica si la conexión es válida
-     */
-    public abstract boolean isHealthy();
+        Connection con = (conexionTransaccional != null) ? conexionTransaccional : pool.take();
 
-    /**
-     * Obtiene el tipo de motor (PostgreSQL, MySQL, etc.)
-     */
-    public String getTipoMotor() {
-        return tipoMotor;
+        try (Statement st = con.createStatement()) {
+            st.execute(sql);
+        } finally {
+            if (conexionTransaccional == null) pool.offer(con);
+        }
     }
 
-    /**
-     * Obtiene el nombre identificador del componente
-     */
-    public String getNombre() {
-        return nombre;
+    public void transaction() throws Exception {
+        if (conexionTransaccional == null) {
+            conexionTransaccional = pool.take();
+            conexionTransaccional.setAutoCommit(false);
+        }
     }
 
-    /**
-     * Escapa un identificador según el motor específico
-     */
-    public abstract String escapeIdentifier(String identifier);
-
-    @Override
-    public String toString() {
-        return String.format("DBComponent[nombre=%s, tipo=%s]", nombre, tipoMotor);
+    public void commit() throws Exception {
+        if (conexionTransaccional != null) {
+            conexionTransaccional.commit();
+            conexionTransaccional.setAutoCommit(true);
+            pool.offer(conexionTransaccional);
+            conexionTransaccional = null;
+        }
     }
 }
