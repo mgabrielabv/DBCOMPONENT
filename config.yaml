@@ -1,8 +1,6 @@
 url: "jdbc:mysql://localhost:3306/test_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true"
 usuario: "root"
-clave: "maria123"
+clave: "123456789"
 driver: "com.mysql.cj.jdbc.Driver"
 poolSize: 10
-queries:
-  test_query: "SELECT 1"
-  default: "SELECT * FROM usuarios"
+queriesFile: "queries.yaml"

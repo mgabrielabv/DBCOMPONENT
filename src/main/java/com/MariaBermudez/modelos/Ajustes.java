@@ -11,6 +11,8 @@ public class Ajustes {
     private int poolSize;
     // Aquí vive la lista interna de queries predefinidas
     private Map<String, String> queries = new HashMap<>();
+    // Nombre de archivo (en resources) que contiene solo las queries (opcional)
+    private String queriesFile;
 
     // Getters y Setters
     public String getUrl() { return url; }
@@ -25,4 +27,7 @@ public class Ajustes {
     public void setPoolSize(int poolSize) { this.poolSize = poolSize; }
     public Map<String, String> getQueries() { return queries; }
     public void setQueries(Map<String, String> queries) { this.queries = queries; }
+
+    public String getQueriesFile() { return queriesFile; }
+    public void setQueriesFile(String queriesFile) { this.queriesFile = queriesFile; }
 }

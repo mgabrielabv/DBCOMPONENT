@@ -1,0 +1,5 @@
+# queries.toml
+insertar_usuario = "INSERT INTO usuarios (nombre, email) VALUES ('nombre_x', 'email_x')"
+borrar_usuario = "DELETE FROM usuarios WHERE id = 1"
+lista_usuarios = "SELECT * FROM usuarios"
+

@@ -1,12 +1,14 @@
 package com.MariaBermudez.configuracion;
 
 import com.MariaBermudez.modelos.Ajustes;
+import com.MariaBermudez.utilidades.QueryLoader;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.toml.TomlFactory; // <--- Importante
 import java.io.*;
 import java.util.Properties;
 import java.util.HashMap;
+import java.util.Map;
 
 public class CargadorConfig {
 
@@ -18,21 +20,41 @@ public class CargadorConfig {
 
         String rutaMinuscula = ruta.toLowerCase();
 
+        Ajustes ajustes;
+
         if (rutaMinuscula.endsWith(".json")) {
-            return cargarDesdeJSON(archivo);
+            ajustes = cargarDesdeJSON(archivo);
         }
         else if (rutaMinuscula.endsWith(".yaml") || rutaMinuscula.endsWith(".yml")) {
-            return cargarDesdeYAML(archivo);
+            ajustes = cargarDesdeYAML(archivo);
         }
         else if (rutaMinuscula.endsWith(".toml")) {
-            return cargarDesdeTOML(archivo);
+            ajustes = cargarDesdeTOML(archivo);
         }
         else if (rutaMinuscula.endsWith(".properties")) {
-            return cargarDesdeProperties(archivo);
+            ajustes = cargarDesdeProperties(archivo);
         }
         else {
             throw new IllegalArgumentException("Formato no soportado: " + ruta);
         }
+
+        // Si en los ajustes viene indicado un archivo de queries, intentar cargarlo desde resources
+        String qfile = ajustes.getQueriesFile();
+        if (qfile != null && !qfile.trim().isEmpty()) {
+            try {
+                Map<String, String> externas = QueryLoader.cargar(qfile.trim());
+                if (externas != null) {
+                    // Las externas sobrescriben o se añaden a las queries ya definidas
+                    ajustes.getQueries().putAll(externas);
+                }
+            } catch (Exception ex) {
+                // No hacer fallar la carga del config por un archivo de queries faltante,
+                // pero informar en la traza para que el desarrollador lo note.
+                System.err.println("Advertencia: no se pudo cargar el archivo de queries '" + qfile + "': " + ex.getMessage());
+            }
+        }
+
+        return ajustes;
     }
 
     private static Ajustes cargarDesdeJSON(File archivo) throws Exception {
@@ -64,6 +86,12 @@ public class CargadorConfig {
         a.setUsuario(p.getProperty("db.user"));
         a.setClave(p.getProperty("db.password"));
         a.setDriver(p.getProperty("db.driver"));
+
+        // Leer queriesFile si está presente
+        String qfile = p.getProperty("queriesFile");
+        if (qfile != null && !qfile.trim().isEmpty()) {
+            a.setQueriesFile(qfile.trim());
+        }
 
         String poolSizeStr = p.getProperty("db.poolSize", "10");
         a.setPoolSize(Integer.parseInt(poolSizeStr));

@@ -82,6 +82,9 @@
                 <includes>
                     <include>**/*.json</include>
                     <include>**/*.properties</include>
+                    <include>**/*.yaml</include>
+                    <include>**/*.yml</include>
+                    <include>**/*.toml</include>
                 </includes>
             </resource>
         </resources>

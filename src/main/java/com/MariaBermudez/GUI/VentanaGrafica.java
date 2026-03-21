@@ -3,18 +3,26 @@ package com.MariaBermudez.GUI;
 import com.MariaBermudez.db.DBManager;
 import com.MariaBermudez.modelos.Ajustes;
 import com.MariaBermudez.configuracion.CargadorConfig;
+import com.MariaBermudez.utilidades.QueryLoader;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.RadialGradientPaint;
 import java.awt.geom.Point2D;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Map;
 
 public class VentanaGrafica extends JFrame {
-    private JTextField fldConfig, fldId, fldMuestras;
+    private JTextField fldConfig, fldQueriesFile, fldId, fldMuestras;
     private JTextArea consola;
     private JProgressBar barra;
     private JButton btnConectar, btnIniciar;
+    private JButton btnStartTxn, btnAddToTxn, btnCommit, btnRollback;
+    private JTextArea txnArea;
     private PanelGrafico panelGrafico;
+    private List<String> txnList = new ArrayList<>();
+    private boolean txnActive = false;
 
     public VentanaGrafica() {
         Estilos.aplicar(this);
@@ -52,14 +60,16 @@ public class VentanaGrafica extends JFrame {
     }
 
     private void initUI() {
-        JPanel pnlTop = new JPanel(new GridLayout(1, 3, 20, 0));
+        JPanel pnlTop = new JPanel(new GridLayout(1, 4, 20, 0));
         pnlTop.setOpaque(false);
 
         fldConfig = new JTextField("configMySQL.json");
+        fldQueriesFile = new JTextField("queries.json");
         fldId = new JTextField("default");
         fldMuestras = new JTextField("500");
 
         pnlTop.add(crearCaja("Configuración", fldConfig));
+        pnlTop.add(crearCaja("Archivo Queries", fldQueriesFile));
         pnlTop.add(crearCaja("Query ID", fldId));
         pnlTop.add(crearCaja("Nº Muestras", fldMuestras));
 
@@ -82,8 +92,38 @@ public class VentanaGrafica extends JFrame {
         chartWrap.setBorder(Estilos.crearBordeNeon("RENDIMIENTO (%)"));
         chartWrap.add(panelGrafico);
 
+        // Panel lateral para transacciones
+        JPanel txnPanel = new JPanel(new BorderLayout(5,5));
+        txnPanel.setOpaque(false);
+        txnPanel.setBorder(Estilos.crearBordeNeon("TRANSACCIÓN"));
+
+        txnArea = new JTextArea();
+        txnArea.setEditable(false);
+        txnArea.setBackground(Estilos.PANEL_INTERNO);
+        txnArea.setForeground(Color.WHITE);
+        txnArea.setFont(Estilos.FUENTE_MONO);
+        JScrollPane txnScroll = new JScrollPane(txnArea);
+        txnPanel.add(txnScroll, BorderLayout.CENTER);
+
+        JPanel txnBtns = new JPanel(new GridLayout(2,2,5,5));
+        txnBtns.setOpaque(false);
+        btnStartTxn = Estilos.crearBoton("Iniciar Txn", false);
+        btnAddToTxn = Estilos.crearBoton("Agregar ID", false);
+        btnCommit = Estilos.crearBoton("Commit", false);
+        btnRollback = Estilos.crearBoton("Rollback", false);
+        txnBtns.add(btnStartTxn);
+        txnBtns.add(btnAddToTxn);
+        txnBtns.add(btnCommit);
+        txnBtns.add(btnRollback);
+        txnPanel.add(txnBtns, BorderLayout.SOUTH);
+
+        JPanel rightWrap = new JPanel(new BorderLayout());
+        rightWrap.setOpaque(false);
+        rightWrap.add(chartWrap, BorderLayout.CENTER);
+        rightWrap.add(txnPanel, BorderLayout.SOUTH);
+
         pnlCenter.add(scroll, BorderLayout.CENTER);
-        pnlCenter.add(chartWrap, BorderLayout.EAST);
+        pnlCenter.add(rightWrap, BorderLayout.EAST);
 
         JPanel pnlBottom = new JPanel(new BorderLayout(10, 15));
         pnlBottom.setOpaque(false);
@@ -112,8 +152,13 @@ public class VentanaGrafica extends JFrame {
         add(pnlCenter, BorderLayout.CENTER);
         add(pnlBottom, BorderLayout.SOUTH);
 
+        // Listeners
         btnConectar.addActionListener(e -> conectar());
         btnIniciar.addActionListener(e -> ejecutar());
+        btnStartTxn.addActionListener(e -> iniciarTransaccion());
+        btnAddToTxn.addActionListener(e -> agregarATransaccion());
+        btnCommit.addActionListener(e -> commitTransaccion());
+        btnRollback.addActionListener(e -> rollbackTransaccion());
     }
 
     private JPanel crearCaja(String txt, JTextField f) {
@@ -128,6 +173,25 @@ public class VentanaGrafica extends JFrame {
     private void conectar() {
         try {
             Ajustes a = CargadorConfig.leer(fldConfig.getText());
+
+            // Si se especificó un archivo de queries en la UI, cargarlo y mezclar
+            String qfile = fldQueriesFile.getText();
+            if (qfile != null && !qfile.trim().isEmpty()) {
+                try {
+                    Map<String, String> externas = QueryLoader.cargar(qfile.trim());
+                    if (externas != null) a.getQueries().putAll(externas);
+                    log("SISTEMA: Cargado archivo de queries: " + qfile.trim());
+                } catch (Exception ex) {
+                    // Mostrar diagnóstico completo en la traza para facilitar debugging
+                    log("WARN: No se pudo cargar archivo de queries: " + ex.getMessage());
+                    java.io.StringWriter sw = new java.io.StringWriter();
+                    java.io.PrintWriter pw = new java.io.PrintWriter(sw);
+                    ex.printStackTrace(pw);
+                    pw.flush();
+                    log(sw.getBuffer().toString());
+                }
+            }
+
             DBManager.iniciar(a);
             log("SISTEMA: Motor conectado.");
             btnIniciar.setEnabled(true);
@@ -177,6 +241,71 @@ public class VentanaGrafica extends JFrame {
         } catch (NumberFormatException e) {
             log("ERROR: El número de muestras debe ser un entero.");
         }
+    }
+
+    // Transacción: iniciar conexión transaccional
+    private void iniciarTransaccion() {
+        try {
+            DBManager.getComponent().transaction();
+            txnActive = true;
+            log("TRANSACCIÓN: iniciada (modo manual). Agregue IDs y luego haga Commit o Rollback.");
+        } catch (Exception e) { log("ERR: " + e.getMessage()); }
+    }
+
+    // Añadir el id actual al buffer de transacción
+    private void agregarATransaccion() {
+        String id = fldId.getText();
+        if (id == null || id.trim().isEmpty()) { log("ERROR: ID vacío"); return; }
+        txnList.add(id.trim());
+        actualizarTxnArea();
+        log("TRANSACCIÓN: agregado ID='" + id.trim() + "'");
+    }
+
+    private void actualizarTxnArea() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < txnList.size(); i++) {
+            sb.append((i+1)).append(". ").append(txnList.get(i)).append('\n');
+        }
+        txnArea.setText(sb.toString());
+    }
+
+    // Ejecutar el batch de IDs en una transacción (commit automático si no estaba iniciada manualmente)
+    private void commitTransaccion() {
+        try {
+            if (txnList.isEmpty()) { log("TRANSACCIÓN: no hay queries en la lista."); return; }
+
+            if (txnActive) {
+                // La transacción ya está abierta por el usuario: ejecutar cada query con query() (usa la conexión transaccional)
+                for (String id : new ArrayList<>(txnList)) {
+                    DBManager.getComponent().query(id);
+                }
+                DBManager.getComponent().commit();
+                log("TRANSACCIÓN: commit realizado (modo manual).");
+            } else {
+                // No estaba iniciada manualmente: usar el método que hace start/commit automático
+                DBManager.getComponent().executeBatchByIds(new ArrayList<>(txnList));
+                log("TRANSACCIÓN: commit realizado (modo batch automático).");
+            }
+
+            txnList.clear();
+            actualizarTxnArea();
+            txnActive = false;
+        } catch (Exception e) { log("ERR: " + e.getMessage()); }
+    }
+
+    private void rollbackTransaccion() {
+        try {
+            if (txnActive) {
+                DBManager.getComponent().rollback();
+                log("TRANSACCIÓN: rollback realizado (modo manual).");
+            } else {
+                // Si no está activa, limpiar la lista local
+                log("TRANSACCIÓN: rollback (modo batch) - limpiando lista local.");
+            }
+            txnList.clear();
+            actualizarTxnArea();
+            txnActive = false;
+        } catch (Exception e) { log("ERR: " + e.getMessage()); }
     }
 
     private void log(String m) { consola.append(" > " + m + "\n"); }
