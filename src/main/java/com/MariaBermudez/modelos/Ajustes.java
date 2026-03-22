@@ -9,7 +9,6 @@ public class Ajustes {
     private String clave;
     private String driver;
     private int poolSize;
-    // Aquí vive la lista interna de queries predefinidas
     private Map<String, String> queries = new HashMap<>();
     // Nombre de archivo (en resources) que contiene solo las queries (opcional)
     private String queriesFile;

@@ -7,10 +7,10 @@ import java.awt.geom.RoundRectangle2D;
 
 public class Estilos {
     // Paleta: Deep Amethyst & Electric Violet
-    public static final Color FONDO_OBSCURO = new Color(15, 10, 25); // Morado casi negro
-    public static final Color PANEL_INTERNO = new Color(30, 20, 45); // Morado medio
-    public static final Color MORADO_ELECTRICO = new Color(180, 70, 255); // El color que "brilla"
-    public static final Color CIAN_CONTRASTE = new Color(0, 255, 200);   // Para éxitos
+    public static final Color FONDO_OBSCURO = new Color(15, 10, 25);
+    public static final Color PANEL_INTERNO = new Color(30, 20, 45);
+    public static final Color MORADO_ELECTRICO = new Color(180, 70, 255);
+    public static final Color CIAN_CONTRASTE = new Color(0, 255, 200);
     public static final Color TEXTO_OPACO = new Color(180, 160, 200);
 
     public static final Font FUENTE_TITULO = new Font("Segoe UI", Font.BOLD, 14);

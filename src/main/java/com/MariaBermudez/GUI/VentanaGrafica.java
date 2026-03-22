@@ -239,7 +239,7 @@ public class VentanaGrafica extends JFrame {
                 });
             });
         } catch (NumberFormatException e) {
-            log("ERROR: El número de muestras debe ser un entero.");
+            log("ERROR: El numero de muestras debe ser un entero.");
         }
     }
 
