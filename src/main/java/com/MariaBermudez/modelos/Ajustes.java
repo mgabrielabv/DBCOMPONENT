@@ -10,10 +10,8 @@ public class Ajustes {
     private String driver;
     private int poolSize;
     private Map<String, String> queries = new HashMap<>();
-    // Nombre de archivo (en resources) que contiene solo las queries (opcional)
     private String queriesFile;
 
-    // Getters y Setters
     public String getUrl() { return url; }
     public void setUrl(String url) { this.url = url; }
     public String getUsuario() { return usuario; }
@@ -26,7 +24,6 @@ public class Ajustes {
     public void setPoolSize(int poolSize) { this.poolSize = poolSize; }
     public Map<String, String> getQueries() { return queries; }
     public void setQueries(Map<String, String> queries) { this.queries = queries; }
-
     public String getQueriesFile() { return queriesFile; }
     public void setQueriesFile(String queriesFile) { this.queriesFile = queriesFile; }
 }

@@ -6,7 +6,6 @@ import java.awt.*;
 import java.awt.geom.RoundRectangle2D;
 
 public class Estilos {
-    // Paleta: Deep Amethyst & Electric Violet
     public static final Color FONDO_OBSCURO = new Color(15, 10, 25);
     public static final Color PANEL_INTERNO = new Color(30, 20, 45);
     public static final Color MORADO_ELECTRICO = new Color(180, 70, 255);

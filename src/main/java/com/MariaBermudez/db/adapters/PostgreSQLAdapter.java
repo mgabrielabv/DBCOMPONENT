@@ -1,9 +1,10 @@
 package com.MariaBermudez.db.adapters;
+import java.sql.*;
 
 public class PostgreSQLAdapter implements IAdapter {
     @Override
-    public java.sql.Connection conectar(String url, String user, String pass) throws Exception {
+    public Connection conectar(String url, String user, String pass) throws Exception {
         Class.forName("org.postgresql.Driver");
-        return java.sql.DriverManager.getConnection(url, user, pass);
+        return DriverManager.getConnection(url, user, pass);
     }
 }

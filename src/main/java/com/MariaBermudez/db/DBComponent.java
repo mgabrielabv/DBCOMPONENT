@@ -2,14 +2,14 @@ package com.MariaBermudez.db;
 
 import com.MariaBermudez.db.adapters.IAdapter;
 import java.sql.*;
-import java.util.Map;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 public class DBComponent<T extends IAdapter> {
     private final ArrayBlockingQueue<Connection> pool;
     private final Map<String, String> queries;
-    private Connection conexionTransaccional = null;
+    private Connection txConnection = null;
 
     public DBComponent(IAdapter adapter, String url, String user, String pass, int poolSize, Map<String, String> queries) throws Exception {
         this.queries = queries;
@@ -19,85 +19,59 @@ public class DBComponent<T extends IAdapter> {
         }
     }
 
-    public void query(String id) throws Exception {
-        String sql = queries.get(id);
-        if (sql == null) throw new Exception("ID de query no encontrado: " + id);
-
-
-        Connection con = (conexionTransaccional != null) ? conexionTransaccional : pool.take();
-
-        try (Statement st = con.createStatement()) {
-            st.execute(sql);
-        } finally {
-            if (conexionTransaccional == null) pool.offer(con);
-        }
-    }
-
-    // Ejecutar SQL crudo (sin usar el mapa de queries)
-    public void executeRaw(String sql) throws Exception {
-        if (sql == null || sql.trim().isEmpty()) throw new Exception("SQL vacío");
-
-        Connection con = (conexionTransaccional != null) ? conexionTransaccional : pool.take();
-        try (Statement st = con.createStatement()) {
-            st.execute(sql);
-        } finally {
-            if (conexionTransaccional == null) pool.offer(con);
-        }
-    }
-
-    // Iniciar una transacción. Si ya existe, no hace nada.
-    public void transaction() throws Exception {
-        if (conexionTransaccional == null) {
-            conexionTransaccional = pool.take();
-            conexionTransaccional.setAutoCommit(false);
-        }
-    }
-
-    // Ejecutar una lista de ids de queries dentro de una transacción (commit al final).
-    // Si ocurre un error se hace rollback automático.
-    public void executeBatchByIds(List<String> ids) throws Exception {
-        if (ids == null || ids.isEmpty()) return;
-
-        boolean startedHere = false;
+    public <R> DBQueryResult<List<R>> query(String id, RowMapper<R> mapper) throws DBException {
+        String sql = getSql(id);
+        Connection con = null;
         try {
-            if (conexionTransaccional == null) {
-                transaction();
-                startedHere = true;
+            con = (txConnection != null) ? txConnection : pool.poll(5, TimeUnit.SECONDS);
+            if (con == null) throw new DBException(DBException.Category.CONNECTION, "Timeout esperando conexion", null);
+            try (Statement st = con.createStatement(); ResultSet rs = st.executeQuery(sql)) {
+                List<R> list = new ArrayList<>();
+                while (rs.next()) list.add(mapper.mapRow(rs));
+                return new DBQueryResult<>(list, 0);
             }
+        } catch (Exception e) { throw handleException(e); }
+        finally { if (txConnection == null && con != null) pool.offer(con); }
+    }
 
-            for (String id : ids) {
-                String sql = queries.get(id);
-                if (sql == null) throw new Exception("ID de query no encontrado en batch: " + id);
-                try (Statement st = conexionTransaccional.createStatement()) {
-                    st.execute(sql);
-                }
+    public DBQueryResult<Integer> update(String id) throws DBException {
+        String sql = getSql(id);
+        Connection con = null;
+        try {
+            con = (txConnection != null) ? txConnection : pool.poll(5, TimeUnit.SECONDS);
+            try (Statement st = con.createStatement()) {
+                int affected = st.executeUpdate(sql);
+                return new DBQueryResult<>(affected, affected);
             }
+        } catch (Exception e) { throw handleException(e); }
+        finally { if (txConnection == null && con != null) pool.offer(con); }
+    }
 
-            if (startedHere) commit();
-        } catch (Exception ex) {
-            // Si la transacción fue iniciada aquí intentamos rollback
-            if (startedHere) {
-                try { rollback(); } catch (Exception r) { /* ignorar*/ }
-            }
-            throw ex;
-        }
+    public void begin() throws Exception {
+        if (txConnection == null) { txConnection = pool.take(); txConnection.setAutoCommit(false); }
     }
 
     public void commit() throws Exception {
-        if (conexionTransaccional != null) {
-            conexionTransaccional.commit();
-            conexionTransaccional.setAutoCommit(true);
-            pool.offer(conexionTransaccional);
-            conexionTransaccional = null;
-        }
+        if (txConnection != null) { try { txConnection.commit(); } finally { finalizeTx(); } }
     }
 
-    public void rollback() throws Exception {
-        if (conexionTransaccional != null) {
-            conexionTransaccional.rollback();
-            conexionTransaccional.setAutoCommit(true);
-            pool.offer(conexionTransaccional);
-            conexionTransaccional = null;
-        }
+    public void rollback() {
+        if (txConnection != null) { try { txConnection.rollback(); } catch (SQLException e) {} finally { finalizeTx(); } }
+    }
+
+    private void finalizeTx() {
+        try { txConnection.setAutoCommit(true); } catch (Exception e) {}
+        pool.offer(txConnection);
+        txConnection = null;
+    }
+
+    private String getSql(String id) throws DBException {
+        String sql = queries.get(id);
+        if (sql == null) throw new DBException(DBException.Category.SYNTAX, "ID de query inexistente: " + id, null);
+        return sql;
+    }
+
+    private DBException handleException(Exception e) {
+        return (e instanceof SQLException se) ? DBException.fromSQLException(se) : new DBException(DBException.Category.UNKNOWN, e.getMessage(), e);
     }
 }

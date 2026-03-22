@@ -3,13 +3,11 @@ package com.MariaBermudez.db;
 import com.MariaBermudez.modelos.Ajustes;
 
 public class DBManager {
-    private static DBComponent<?> componente;
+    private static DBComponent<?> instancia;
 
     public static void iniciar(Ajustes config) throws Exception {
-        componente = DBFactory.crear(config);
+        if (instancia == null) instancia = DBFactory.crear(config);
     }
 
-    public static DBComponent<?> getComponent() {
-        return componente;
-    }
+    public static DBComponent<?> get() { return instancia; }
 }

@@ -86,7 +86,7 @@ public class PanelGrafico extends JPanel {
 
         Font etiqueta = Estilos.FUENTE_TITULO.deriveFont(Font.PLAIN, Math.max(10f, innerDiam * 0.09f));
         g2.setFont(etiqueta);
-        String label = "Éxito";
+        String label = "Exito";
         FontMetrics fm2 = g2.getFontMetrics();
         int lx = ix + (innerDiam - fm2.stringWidth(label)) / 2;
         int ly = py + fm2.getHeight();

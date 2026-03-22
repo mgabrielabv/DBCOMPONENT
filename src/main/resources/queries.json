@@ -1,5 +1,9 @@
 {
-  "insertar_usuario": "INSERT INTO usuarios (nombre, correo) VALUES (?, ?)",
-  "borrar_usuario": "DELETE FROM usuarios WHERE id = ?",
-  "lista_usuarios": "SELECT * FROM usuarios"
+  "test_conexion": "SELECT 1",
+  "obtener_fecha": "SELECT NOW()",
+  "version_motor": "SELECT version()",
+  "db_actual": "SELECT current_database()",
+  "usuario_sesion": "SELECT current_user",
+  "calculo_pi": "SELECT 3.14159 * 2",
+  "estado_actividad": "SELECT count(*) FROM pg_stat_activity"
 }
