@@ -32,7 +32,7 @@ public class DBController {
     }
 
     public void ejecutarPrueba(String qId, int total, BiConsumer<Integer, Integer> progreso, Consumer<String> callback) {
-        // Opción B: Usamos arreglos para que sean "effectively final" y la lambda los acepte
+
         final int[] ok = {0};
         final int[] err = {0};
 
@@ -47,7 +47,6 @@ public class DBController {
                         err[0]++;
                     }
 
-                    // Capturamos el progreso actual
                     int actualOk = ok[0];
                     int actualErr = err[0];
                     int paso = i;
@@ -58,7 +57,6 @@ public class DBController {
                 }
                 DBManager.get().commit();
 
-                // Capturamos resultados finales
                 int finalOk = ok[0];
                 int finalErr = err[0];
                 SwingUtilities.invokeLater(() ->
