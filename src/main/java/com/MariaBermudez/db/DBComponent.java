@@ -34,18 +34,6 @@ public class DBComponent<T extends IAdapter> {
         finally { if (txConnection == null && con != null) pool.offer(con); }
     }
 
-    public DBQueryResult<Integer> update(String id) throws DBException {
-        String sql = getSql(id);
-        Connection con = null;
-        try {
-            con = (txConnection != null) ? txConnection : pool.poll(5, TimeUnit.SECONDS);
-            try (Statement st = con.createStatement()) {
-                int affected = st.executeUpdate(sql);
-                return new DBQueryResult<>(affected, affected);
-            }
-        } catch (Exception e) { throw handleException(e); }
-        finally { if (txConnection == null && con != null) pool.offer(con); }
-    }
 
     public void begin() throws Exception {
         if (txConnection == null) { txConnection = pool.take(); txConnection.setAutoCommit(false); }

@@ -1,5 +1,4 @@
-# Configuración de queries para Stress Test
-queries:
+
   test_conexion: "SELECT 1"
   obtener_fecha: "SELECT NOW()"
   version_motor: "SELECT version()"

@@ -3,9 +3,5 @@
   "usuario": "root",
   "clave": "maria123",
   "driver": "com.mysql.cj.jdbc.Driver",
-  "poolSize": 20,
-  "queriesFile": "queries.json",
-  "queries": {
-    "default": "SELECT * FROM usuarios LIMIT 100"
-  }
+  "poolSize": 20
 }

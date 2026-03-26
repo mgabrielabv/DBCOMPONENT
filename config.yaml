@@ -3,4 +3,3 @@ usuario: "root"
 clave: "maria123"
 driver: "com.mysql.cj.jdbc.Driver"
 poolSize: 10
-queriesFile: "queries.yaml"

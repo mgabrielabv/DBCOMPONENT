@@ -3,10 +3,9 @@ package com.MariaBermudez.GUI;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import java.awt.geom.Point2D;
 
 public class VentanaGrafica extends JFrame {
-    private JTextField fldConfig, fldId, fldMuestras;
+    private JTextField fldConfig, fldQueries, fldId, fldMuestras;
     private JTextArea consola;
     private JProgressBar barra;
     private JButton btnConectar, btnIniciar;
@@ -15,64 +14,69 @@ public class VentanaGrafica extends JFrame {
 
     public VentanaGrafica() {
         Estilos.aplicar(this);
-        setTitle("DBComponent");
-        setSize(1000, 700);
+        setTitle("DBComponent - Stress Test Tool");
+        setSize(1100, 750);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
 
-        JPanel root = new JPanel(new BorderLayout(20, 20)) {
-            @Override
-            protected void paintComponent(Graphics g) {
-                super.paintComponent(g);
-                Graphics2D g2 = (Graphics2D) g.create();
-                int w = getWidth(), h = getHeight();
-                RadialGradientPaint rg = new RadialGradientPaint(
-                        new Point2D.Float(w / 2, h / 2), Math.max(w, h),
-                        new float[]{0f, 1f},
-                        new Color[]{new Color(30, 30, 50), new Color(10, 10, 20)}
-                );
-                g2.setPaint(rg);
-                g2.fillRect(0, 0, w, h);
-                g2.dispose();
-            }
-        };
-        root.setOpaque(false);
-        root.setBorder(new EmptyBorder(25, 25, 25, 25));
+        // ROOT PANEL: Ahora con fondo sólido de Estilos
+        JPanel root = new JPanel(new BorderLayout(25, 25));
+        root.setOpaque(true);
+        root.setBackground(Estilos.FONDO_OBSCURO);
+        root.setBorder(new EmptyBorder(30, 30, 30, 30));
         setContentPane(root);
 
-        JPanel pnlTop = new JPanel(new GridLayout(1, 3, 20, 0));
+        // TOP PANEL
+        JPanel pnlTop = new JPanel(new GridLayout(1, 4, 25, 0));
         pnlTop.setOpaque(false);
-        fldConfig = new JTextField("config.json");
+
+        fldConfig = new JTextField("configPostgreSQL.json");
+        fldQueries = new JTextField("queries.json");
         fldId = new JTextField("test_conexion");
         fldMuestras = new JTextField("100");
-        pnlTop.add(crearCaja("Archivo Config", fldConfig));
-        pnlTop.add(crearCaja("ID de Consulta", fldId));
-        pnlTop.add(crearCaja("Total Muestras", fldMuestras));
 
-        JPanel pnlCenter = new JPanel(new GridLayout(1, 2, 20, 0));
+        pnlTop.add(crearCaja("Configuración", fldConfig));
+        pnlTop.add(crearCaja("Archivo Queries", fldQueries));
+        pnlTop.add(crearCaja("ID Query", fldId));
+        pnlTop.add(crearCaja("Muestras", fldMuestras));
+
+        // CENTER PANEL
+        JPanel pnlCenter = new JPanel(new GridLayout(1, 2, 25, 0));
         pnlCenter.setOpaque(false);
 
         consola = new JTextArea();
         consola.setEditable(false);
-        consola.setBackground(new Color(15, 15, 25));
-        consola.setForeground(Color.CYAN);
+        consola.setBackground(Estilos.PANEL_INTERNO);
+        consola.setForeground(Estilos.CIAN_CONTRASTE);
+        consola.setFont(Estilos.FUENTE_MONO);
+
         JScrollPane scroll = new JScrollPane(consola);
-        scroll.setBorder(Estilos.crearBordeNeon("Queries y conexiones"));
+        scroll.setBorder(Estilos.crearBordeNeon("LOG DE EVENTOS"));
+        scroll.setOpaque(false);
+        scroll.getViewport().setOpaque(false);
 
         panelGrafico = new PanelGrafico();
-        panelGrafico.setBorder(Estilos.crearBordeNeon("RENDIMIENTO EN TIEMPO REAL"));
+        JPanel wrapperGrafico = new JPanel(new BorderLayout());
+        wrapperGrafico.setOpaque(false);
+        wrapperGrafico.setBorder(Estilos.crearBordeNeon("RENDIMIENTO"));
+        wrapperGrafico.add(panelGrafico);
 
         pnlCenter.add(scroll);
-        pnlCenter.add(panelGrafico);
+        pnlCenter.add(wrapperGrafico);
 
-        JPanel pnlBottom = new JPanel(new BorderLayout(10, 10));
+        // BOTTOM PANEL
+        JPanel pnlBottom = new JPanel(new BorderLayout(15, 15));
         pnlBottom.setOpaque(false);
+
         barra = new JProgressBar();
         barra.setStringPainted(true);
+        barra.setBackground(Estilos.PANEL_INTERNO);
+        barra.setForeground(Estilos.MORADO_ELECTRICO);
+        barra.setBorder(BorderFactory.createLineBorder(Estilos.MORADO_ELECTRICO));
 
-        JPanel pnlBtns = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JPanel pnlBtns = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 0));
         pnlBtns.setOpaque(false);
         btnConectar = Estilos.crearBoton("CONECTAR", false);
-        btnIniciar = Estilos.crearBoton("INICIAR", true);
+        btnIniciar = Estilos.crearBoton("INICIAR TEST", true);
         btnIniciar.setEnabled(false);
 
         pnlBtns.add(btnConectar);
@@ -80,11 +84,13 @@ public class VentanaGrafica extends JFrame {
         pnlBottom.add(barra, BorderLayout.NORTH);
         pnlBottom.add(pnlBtns, BorderLayout.SOUTH);
 
-        add(pnlTop, BorderLayout.NORTH);
-        add(pnlCenter, BorderLayout.CENTER);
-        add(pnlBottom, BorderLayout.SOUTH);
+        root.add(pnlTop, BorderLayout.NORTH);
+        root.add(pnlCenter, BorderLayout.CENTER);
+        root.add(pnlBottom, BorderLayout.SOUTH);
 
-        btnConectar.addActionListener(e -> controller.conectar(fldConfig.getText(), this::log, () -> btnIniciar.setEnabled(true)));
+        btnConectar.addActionListener(e ->
+                controller.conectar(fldConfig.getText(), fldQueries.getText(), this::log, () -> btnIniciar.setEnabled(true))
+        );
         btnIniciar.addActionListener(e -> ejecutarPrueba());
 
         setLocationRelativeTo(null);
@@ -96,7 +102,6 @@ public class VentanaGrafica extends JFrame {
             barra.setMaximum(total);
             barra.setValue(0);
             btnIniciar.setEnabled(false);
-
             controller.ejecutarPrueba(fldId.getText(), total, (ok, err) -> {
                 barra.setValue(ok + err);
                 panelGrafico.actualizar(ok, err);
@@ -112,10 +117,10 @@ public class VentanaGrafica extends JFrame {
     }
 
     private JPanel crearCaja(String t, JTextField f) {
-        JPanel p = new JPanel(new BorderLayout());
+        JPanel p = new JPanel(new BorderLayout(0, 5));
         p.setOpaque(false);
-        Estilos.estilizarCampo(f);
         p.add(Estilos.crearLabel(t), BorderLayout.NORTH);
+        Estilos.estilizarCampo(f);
         p.add(f, BorderLayout.CENTER);
         return p;
     }
